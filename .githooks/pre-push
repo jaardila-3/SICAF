@@ -1,0 +1,347 @@
+#!/bin/sh
+
+# Hook pre-push para SICAF
+# Ejecuta validaciones exhaustivas antes de permitir push al repositorio remoto
+
+# Configuración
+readonly PROJECT_ROOT="$(git rev-parse --show-toplevel)"
+readonly REMOTE_NAME="$1"
+readonly REMOTE_URL="$2"
+readonly MAIN_BRANCHES="main|master|develop|release"
+readonly CRITICAL_PATHS="src/SICAF.Business|src/SICAF.Data|src/SICAF.Services"
+
+# Colores para output
+readonly RED='\033[0;31m'
+readonly GREEN='\033[0;32m'
+readonly YELLOW='\033[1;33m'
+readonly BLUE='\033[0;34m'
+readonly CYAN='\033[0;36m'
+readonly PURPLE='\033[0;35m'
+readonly NC='\033[0m' # No Color
+
+# Función para logging con timestamp
+log_info() {
+    echo "${BLUE}[$(date +'%H:%M:%S')] ℹ️  $1${NC}"
+}
+
+log_success() {
+    echo "${GREEN}[$(date +'%H:%M:%S')] ✅ $1${NC}"
+}
+
+log_warning() {
+    echo "${YELLOW}[$(date +'%H:%M:%S')] ⚠️  $1${NC}"
+}
+
+log_error() {
+    echo "${RED}[$(date +'%H:%M:%S')] ❌ $1${NC}"
+}
+
+log_step() {
+    echo "${CYAN}[$(date +'%H:%M:%S')] 🚀 $1${NC}"
+}
+
+log_critical() {
+    echo "${PURPLE}[$(date +'%H:%M:%S')] 🔒 $1${NC}"
+}
+
+# Función para mostrar progreso
+show_progress() {
+    local current=$1
+    local total=$2
+    local task=$3
+    echo "${CYAN}[$current/$total] $task${NC}"
+}
+
+# Función para verificar si una rama es protegida
+is_protected_branch() {
+    local branch=$1
+    echo "$branch" | grep -qE "^($MAIN_BRANCHES)$"
+}
+
+# Función para obtener información de commits a pushear
+get_push_info() {
+    local remote_ref=$1
+    local local_ref=$2
+    
+    # Si es una nueva rama, comparar con origin/main o main
+    if [ "$remote_ref" = "0000000000000000000000000000000000000000" ]; then
+        if git rev-parse --verify origin/main >/dev/null 2>&1; then
+            echo "origin/main..$local_ref"
+        else
+            echo "main..$local_ref"
+        fi
+    else
+        echo "$remote_ref..$local_ref"
+    fi
+}
+
+# Función para verificar commits
+verify_commits() {
+    local commit_range=$1
+    local commits_count
+    local commit_messages
+    
+    commits_count=$(git rev-list --count "$commit_range" 2>/dev/null || echo "0")
+    
+    if [ "$commits_count" -eq 0 ]; then
+        log_info "No hay commits nuevos para validar"
+        return 0
+    fi
+    
+    log_info "Validando $commits_count commit(s) nuevos..."
+    
+    # Verificar mensajes de commit
+    commit_messages=$(git log --format="%s" "$commit_range")
+    
+    # Verificar que todos los commits siguen Conventional Commits
+    while IFS= read -r msg; do
+        if [ ! -z "$msg" ] && ! echo "$msg" | grep -qE '^(feat|fix|docs|style|refactor|test|chore|perf|ci|build|revert|hotfix)(\([^)]+\))?: .+ #[0-9]+$'; then
+            log_error "Commit con mensaje inválido: '$msg'"
+            log_info "Debe seguir formato: tipo(ámbito): descripción #número"
+            return 1
+        fi
+    done << EOF
+$commit_messages
+EOF
+    
+    log_success "Mensajes de commits validados"
+    return 0
+}
+
+# Función para verificar archivos modificados
+verify_modified_files() {
+    local commit_range=$1
+    local dangerous_files
+    local critical_changes
+    
+    # Verificar archivos peligrosos modificados
+    dangerous_files=$(git diff --name-only "$commit_range" | grep -E '\.(env|key|pem|p12|pfx)$' || true)
+    
+    if [ ! -z "$dangerous_files" ]; then
+        log_error "Archivos peligrosos detectados en el push:"
+        echo "$dangerous_files" | while read -r file; do
+            echo "  🚨 $file"
+        done
+        return 1
+    fi
+    
+    # Verificar cambios en rutas críticas
+    critical_changes=$(git diff --name-only "$commit_range" | grep -E "($CRITICAL_PATHS)" || true)
+    
+    if [ ! -z "$critical_changes" ]; then
+        log_warning "Cambios en componentes críticos detectados:"
+        echo "$critical_changes" | while read -r file; do
+            echo "  ⚠️  $file"
+        done
+        log_info "Se ejecutarán validaciones adicionales..."
+        return 2  # Código especial para validaciones extra
+    fi
+    
+    return 0
+}
+
+echo "${PURPLE}🔒 Iniciando validaciones pre-push para SICAF${NC}"
+echo "═══════════════════════════════════════════════════════"
+log_info "Remote: $REMOTE_NAME ($REMOTE_URL)"
+
+# Verificar que estamos en un repositorio Git válido
+if ! git rev-parse --git-dir >/dev/null 2>&1; then
+    log_error "No estás en un repositorio Git válido"
+    exit 1
+fi
+
+# Cambiar al directorio raíz del proyecto
+cd "$PROJECT_ROOT" || {
+    log_error "No se pudo acceder al directorio raíz del proyecto"
+    exit 1
+}
+
+# Contador de pasos
+step=1
+total_steps=8
+
+# Variables para almacenar información de push
+has_critical_changes=false
+push_to_protected=false
+
+# Leer información de push desde stdin
+while read local_ref local_sha remote_ref remote_sha; do
+    # Extraer nombre de la rama
+    branch_name=$(echo "$local_ref" | sed 's/refs\/heads\///')
+    
+    log_info "Procesando push a rama: $branch_name"
+    
+    # Verificar si es una rama protegida
+    if is_protected_branch "$branch_name"; then
+        push_to_protected=true
+        log_critical "Push a rama protegida detectado: $branch_name"
+    fi
+    
+    # Obtener rango de commits a validar
+    commit_range=$(get_push_info "$remote_sha" "$local_sha")
+    
+    # 1. Verificar commits
+    show_progress $step $total_steps "Validando commits"
+    if ! verify_commits "$commit_range"; then
+        exit 1
+    fi
+    log_success "Commits validados"
+    
+    # 2. Verificar archivos modificados
+    step=$((step + 1))
+    show_progress $step $total_steps "Verificando archivos modificados"
+    verify_modified_files "$commit_range"
+    file_check_result=$?
+    
+    if [ $file_check_result -eq 1 ]; then
+        exit 1
+    elif [ $file_check_result -eq 2 ]; then
+        has_critical_changes=true
+        log_warning "Cambios críticos detectados - validaciones adicionales requeridas"
+    fi
+    
+    log_success "Archivos verificados"
+done
+
+# 3. Verificar estado del working directory
+step=$((step + 1))
+show_progress $step $total_steps "Verificando estado del repositorio"
+
+if ! git diff-index --quiet HEAD --; then
+    log_error "Hay cambios sin commit en el working directory"
+    log_info "Haz commit de todos los cambios antes del push"
+    exit 1
+fi
+
+log_success "Working directory limpio"
+
+# 4. Compilación completa
+step=$((step + 1))
+show_progress $step $total_steps "Ejecutando compilación completa"
+
+log_info "Compilando solución completa..."
+if ! dotnet build --configuration Release --nologo --verbosity minimal; then
+    log_error "Error en la compilación de Release"
+    log_info "Corrige los errores antes de hacer push"
+    exit 1
+fi
+
+log_success "Compilación exitosa"
+
+# 5. Ejecutar pruebas unitarias
+step=$((step + 1))
+show_progress $step $total_steps "Ejecutando pruebas unitarias"
+
+log_info "Ejecutando pruebas unitarias..."
+if ! dotnet test --configuration Release --nologo --verbosity minimal --no-build --filter "Category!=Integration&Category!=E2E" --logger "console;verbosity=minimal"; then
+    log_error "Algunas pruebas unitarias fallaron"
+    log_info "Todas las pruebas deben pasar antes del push"
+    exit 1
+fi
+
+log_success "Pruebas unitarias completadas"
+
+# 6. Ejecutar pruebas de integración (solo si hay cambios críticos o push a rama protegida)
+step=$((step + 1))
+if [ "$has_critical_changes" = true ] || [ "$push_to_protected" = true ]; then
+    show_progress $step $total_steps "Ejecutando pruebas de integración (críticas)"
+    
+    log_info "Ejecutando pruebas de integración críticas..."
+    if ! dotnet test --configuration Release --nologo --verbosity minimal --no-build --filter "Category=Integration&Priority=High" --logger "console;verbosity=minimal"; then
+        log_error "Pruebas de integración críticas fallaron"
+        log_info "Estas pruebas deben pasar para cambios críticos"
+        exit 1
+    fi
+    
+    log_success "Pruebas de integración críticas completadas"
+else
+    show_progress $step $total_steps "Saltando pruebas de integración (no requeridas)"
+    log_info "Pruebas de integración omitidas - no hay cambios críticos"
+fi
+
+# 7. Verificaciones de seguridad y calidad
+step=$((step + 1))
+show_progress $step $total_steps "Ejecutando verificaciones de seguridad"
+
+# Verificar que no hay TODOs o FIXMEs en código de producción si es push a rama protegida
+if [ "$push_to_protected" = true ]; then
+    log_info "Verificando código de producción..."
+    
+    todo_count=$(find src/ -name "*.cs" -exec grep -l "TODO\|FIXME\|XXX\|HACK" {} \; 2>/dev/null | wc -l | tr -d ' ')
+    
+    if [ "$todo_count" -gt 0 ]; then
+        log_warning "Se encontraron $todo_count archivo(s) con TODO/FIXME en código de producción"
+        
+        # Mostrar algunos ejemplos
+        find src/ -name "*.cs" -exec grep -Hn "TODO\|FIXME\|XXX\|HACK" {} \; 2>/dev/null | head -5 | while read -r line; do
+            echo "  📝 $line"
+        done
+        
+        read -p "¿Continuar con el push a rama protegida? (y/N): " -n 1 -r
+        echo
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            log_error "Push cancelado por el usuario"
+            exit 1
+        fi
+    fi
+fi
+
+# Verificar análisis de código si dotnet-format está disponible
+if command -v dotnet >/dev/null 2>&1 && (dotnet tool list -g | grep -q dotnet-format || dotnet format --version >/dev/null 2>&1); then
+    log_info "Verificando formato de código..."
+    
+    if ! dotnet format --verify-no-changes --verbosity minimal >/dev/null 2>&1; then
+        log_error "El código no cumple con las reglas de formato"
+        log_info "Ejecuta 'dotnet format' antes del push"
+        exit 1
+    fi
+    
+    log_success "Formato de código verificado"
+else
+    log_warning "dotnet-format no disponible, saltando verificación de formato"
+fi
+
+# 8. Verificación final y resumen
+step=$((step + 1))
+show_progress $step $total_steps "Verificación final"
+
+# Mostrar resumen de lo que se va a pushear
+log_info "Preparando resumen del push..."
+
+# Contar archivos y líneas modificadas en total
+total_files=$(git diff --name-only HEAD~1..HEAD 2>/dev/null | wc -l | tr -d ' ')
+total_lines_added=$(git diff --numstat HEAD~1..HEAD 2>/dev/null | awk '{sum+=$1} END {print sum+0}')
+total_lines_removed=$(git diff --numstat HEAD~1..HEAD 2>/dev/null | awk '{sum+=$2} END {print sum+0}')
+
+echo "═══════════════════════════════════════════════════════"
+log_success "📊 Resumen del push:"
+echo "  📁 Archivos modificados: $total_files"
+echo "  ➕ Líneas agregadas: $total_lines_added"
+echo "  ➖ Líneas eliminadas: $total_lines_removed"
+echo "  🎯 Destino: $REMOTE_NAME ($branch_name)"
+
+if [ "$push_to_protected" = true ]; then
+    echo "  🔒 Rama protegida: Sí"
+fi
+
+if [ "$has_critical_changes" = true ]; then
+    echo "  ⚠️  Cambios críticos: Sí"
+fi
+
+echo "═══════════════════════════════════════════════════════"
+
+# Confirmación final para ramas protegidas
+if [ "$push_to_protected" = true ]; then
+    log_critical "Push a rama protegida '$branch_name'"
+    read -p "¿Estás seguro de continuar? (y/N): " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        log_warning "Push cancelado por el usuario"
+        exit 1
+    fi
+fi
+
+log_success "🎉 Todas las validaciones pre-push completadas exitosamente"
+echo "${GREEN}🚀 Tu código está listo para push${NC}"
+
+exit 0

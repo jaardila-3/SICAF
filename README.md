@@ -251,7 +251,7 @@ SICAF/
 ```json
 {
   "ConnectionStrings": {
-    "DefaultConnection": "Server=localhost;Database=SICAF_DB;Uid=sicaf_user;Pwd=desarrollo123;"
+    "DefaultConnection": ""
   },
   "Serilog": {
     "MinimumLevel": {
@@ -286,8 +286,8 @@ SICAF/
 Para producción, usar variables de entorno seguras:
 
 ```bash
-export ConnectionStrings__DefaultConnection="Server=prod-server;Database=SICAF_PROD;Uid=prod_user;Pwd=password_segura;"
-export ASPNETCORE_ENVIRONMENT="Production"
+ConnectionStrings__DefaultConnection="Server=prod-server;Database=SICAF_PROD;Uid=prod_user;Pwd=password_segura;"
+ASPNETCORE_ENVIRONMENT="Production"
 ```
 
 ## 🧪 Pruebas
@@ -337,60 +337,6 @@ az mysql flexible-server create --name mysql-sicaf --resource-group rg-sicaf --a
 az webapp config appsettings set --name sicaf-app --resource-group rg-sicaf --settings \
     ConnectionStrings:DefaultConnection="Server=mysql-sicaf.mysql.database.azure.com;Database=sicaf;Uid=sicafadmin;Pwd=TuPassword123;" \
     ASPNETCORE_ENVIRONMENT="Production"
-```
-
-### Despliegue Local con Docker
-
-#### Dockerfile
-```dockerfile
-FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS base
-WORKDIR /app
-EXPOSE 80
-EXPOSE 443
-
-FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
-WORKDIR /src
-COPY ["src/SICAF.Web/SICAF.Web.csproj", "src/SICAF.Web/"]
-RUN dotnet restore "src/SICAF.Web/SICAF.Web.csproj"
-COPY . .
-WORKDIR "/src/src/SICAF.Web"
-RUN dotnet build "SICAF.Web.csproj" -c Release -o /app/build
-
-FROM build AS publish
-RUN dotnet publish "SICAF.Web.csproj" -c Release -o /app/publish
-
-FROM base AS final
-WORKDIR /app
-COPY --from=publish /app/publish .
-ENTRYPOINT ["dotnet", "SICAF.Web.dll"]
-```
-
-#### docker-compose.yml
-```yaml
-version: '3.8'
-services:
-  sicaf-web:
-    build: .
-    ports:
-      - "5000:80"
-    environment:
-      - ASPNETCORE_ENVIRONMENT=Production
-      - ConnectionStrings__DefaultConnection=Server=sicaf-mysql;Database=sicaf;Uid=root;Pwd=sicaf123;
-    depends_on:
-      - sicaf-mysql
-
-  sicaf-mysql:
-    image: mysql:8.0
-    environment:
-      MYSQL_ROOT_PASSWORD: sicaf123
-      MYSQL_DATABASE: sicaf
-    ports:
-      - "3306:3306"
-    volumes:
-      - mysql_data:/var/lib/mysql
-
-volumes:
-  mysql_data:
 ```
 
 ## 📚 Documentación Adicional

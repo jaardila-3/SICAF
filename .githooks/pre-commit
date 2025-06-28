@@ -1,0 +1,311 @@
+#!/bin/sh
+
+# Hook pre-commit para SICAF
+# Ejecuta validaciones de calidad de código antes de permitir commits
+
+# Configuración
+readonly MAX_FILE_SIZE="10M"
+readonly TEMP_STASH="pre-commit-$(date +%s)"
+readonly PROJECT_ROOT="$(git rev-parse --show-toplevel)"
+
+# Colores para output
+readonly RED='\033[0;31m'
+readonly GREEN='\033[0;32m'
+readonly YELLOW='\033[1;33m'
+readonly BLUE='\033[0;34m'
+readonly CYAN='\033[0;36m'
+readonly NC='\033[0m' # No Color
+
+# Función para logging con timestamp
+log_info() {
+    echo "${BLUE}[$(date +'%H:%M:%S')] ℹ️  $1${NC}"
+}
+
+log_success() {
+    echo "${GREEN}[$(date +'%H:%M:%S')] ✅ $1${NC}"
+}
+
+log_warning() {
+    echo "${YELLOW}[$(date +'%H:%M:%S')] ⚠️  $1${NC}"
+}
+
+log_error() {
+    echo "${RED}[$(date +'%H:%M:%S')] ❌ $1${NC}"
+}
+
+log_step() {
+    echo "${CYAN}[$(date +'%H:%M:%S')] 🔄 $1${NC}"
+}
+
+# Función para mostrar progreso
+show_progress() {
+    local current=$1
+    local total=$2
+    local task=$3
+    echo "${CYAN}[$current/$total] $task${NC}"
+}
+
+# Función para cleanup en caso de error
+cleanup_on_error() {
+    if git stash list | grep -q "$TEMP_STASH"; then
+        log_info "Restaurando cambios no confirmados..."
+        git stash pop -q
+    fi
+}
+
+# Trap para cleanup automático
+trap cleanup_on_error EXIT
+
+echo "${CYAN}🚀 Iniciando validaciones pre-commit para SICAF${NC}"
+echo "═══════════════════════════════════════════════════════"
+
+# Verificar si hay cambios para commit
+if git diff --cached --quiet; then
+    log_warning "No hay cambios en el stage para commit"
+    exit 0
+fi
+
+# Guardar cambios no confirmados (unstaged)
+if ! git diff-files --quiet; then
+    log_info "Guardando cambios no confirmados temporalmente..."
+    git stash push -q --keep-index --include-untracked -m "$TEMP_STASH"
+fi
+
+# Contador de pasos
+step=1
+total_steps=7
+
+# 1. Verificar archivos grandes
+show_progress $step $total_steps "Verificando tamaño de archivos"
+step=$((step + 1))
+
+# Solo verificar archivos en el stage
+staged_files=$(git diff --cached --name-only)
+large_files=""
+
+for file in $staged_files; do
+    if [ -f "$file" ]; then
+        file_size=$(stat -f%z "$file" 2>/dev/null || stat -c%s "$file" 2>/dev/null || echo 0)
+        max_size_bytes=$((10 * 1024 * 1024)) # 10MB en bytes
+        
+        if [ "$file_size" -gt "$max_size_bytes" ]; then
+            large_files="$large_files\n  📁 $file ($(numfmt --to=iec $file_size))"
+        fi
+    fi
+done
+
+if [ ! -z "$large_files" ]; then
+    log_error "Archivos demasiado grandes detectados (>10MB):"
+    echo -e "$large_files"
+    log_info "Soluciones disponibles:"
+    echo "  • Usar Git LFS: git lfs track '*.extension'"
+    echo "  • Agregar al .gitignore si no es necesario"
+    echo "  • Comprimir el archivo si es posible"
+    cleanup_on_error
+    exit 1
+fi
+
+log_success "Tamaño de archivos validado"
+
+# 2. Verificar archivos prohibidos
+show_progress $step $total_steps "Verificando archivos prohibidos"
+step=$((step + 1))
+
+# Patrones de archivos prohibidos
+prohibited_patterns="
+\.env$
+\.env\.local$
+\.env\.production$
+appsettings\.Development\.json$
+appsettings\.Production\.json$
+.*\.log$
+.*\.tmp$
+.*\.cache$
+bin/.*
+obj/.*
+\.vs/.*
+\.vscode/settings\.json$
+\.idea/.*
+.*\.user$
+.*\.suo$
+node_modules/.*
+packages/.*
+\.nuget/.*
+.DS_Store
+"
+
+prohibited_files=""
+for file in $staged_files; do
+    for pattern in $prohibited_patterns; do
+        if echo "$file" | grep -qE "$pattern"; then
+            prohibited_files="$prohibited_files\n  🚫 $file"
+            break
+        fi
+    done
+done
+
+if [ ! -z "$prohibited_files" ]; then
+    log_error "Archivos prohibidos detectados:"
+    echo -e "$prohibited_files"
+    log_info "Estos archivos deben estar en .gitignore"
+    cleanup_on_error
+    exit 1
+fi
+
+log_success "Archivos prohibidos verificados"
+
+# 3. Verificar secretos y credenciales
+show_progress $step $total_steps "Escaneando secretos y credenciales"
+step=$((step + 1))
+
+# Patrones de secretos comunes
+secret_patterns="
+password\s*=\s*['\"][^'\"]+['\"]
+api[_-]?key\s*=\s*['\"][^'\"]+['\"]
+secret\s*=\s*['\"][^'\"]+['\"]
+token\s*=\s*['\"][^'\"]+['\"]
+connectionstring\s*=\s*['\"].*password.*['\"]
+-----BEGIN\s+(RSA\s+)?PRIVATE\s+KEY-----
+"
+
+secrets_found=""
+for file in $staged_files; do
+    if [ -f "$file" ] && file "$file" | grep -q text; then
+        for pattern in $secret_patterns; do
+            if grep -iE "$pattern" "$file" >/dev/null 2>&1; then
+                line_num=$(grep -inE "$pattern" "$file" | head -1 | cut -d: -f1)
+                secrets_found="$secrets_found\n  🔑 $file:$line_num"
+                break
+            fi
+        done
+    fi
+done
+
+if [ ! -z "$secrets_found" ]; then
+    log_error "Posibles secretos detectados:"
+    echo -e "$secrets_found"
+    log_warning "Revisa manualmente estos archivos antes de continuar"
+    read -p "¿Estás seguro de que no hay secretos reales? (y/N): " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        cleanup_on_error
+        exit 1
+    fi
+fi
+
+log_success "Escaneo de secretos completado"
+
+# 4. Verificar sintaxis y compilación .NET
+show_progress $step $total_steps "Verificando compilación .NET"
+step=$((step + 1))
+
+# Verificar si hay archivos .cs en el stage
+cs_files=$(echo "$staged_files" | grep '\.cs$' || true)
+
+if [ ! -z "$cs_files" ]; then
+    log_info "Archivos C# detectados, verificando compilación..."
+    
+    # Compilar solo si hay cambios en archivos .cs
+    if ! dotnet build --nologo --verbosity minimal --no-restore >/dev/null 2>&1; then
+        log_error "Error de compilación detectado"
+        log_info "Ejecutando compilación con detalles..."
+        dotnet build --nologo --verbosity normal
+        cleanup_on_error
+        exit 1
+    fi
+    
+    log_success "Compilación exitosa"
+else
+    log_info "No hay archivos C# para compilar"
+fi
+
+# 5. Análisis de formato de código
+show_progress $step $total_steps "Verificando formato de código"
+step=$((step + 1))
+
+if command -v dotnet >/dev/null 2>&1 && [ ! -z "$cs_files" ]; then
+    # Verificar si dotnet-format está disponible
+    if dotnet tool list -g | grep -q dotnet-format || dotnet format --version >/dev/null 2>&1; then
+        log_info "Verificando formato con dotnet-format..."
+        
+        if ! dotnet format --verify-no-changes --verbosity minimal >/dev/null 2>&1; then
+            log_error "El código no cumple con las reglas de formato"
+            log_info "Ejecuta 'dotnet format' para corregir automáticamente"
+            log_info "O ejecuta 'dotnet format --include $(echo $cs_files | tr \\n ,)' para archivos específicos"
+            
+            # Preguntar si quiere autoformatear
+            read -p "¿Quieres formatear automáticamente ahora? (y/N): " -n 1 -r
+            echo
+            if [[ $REPLY =~ ^[Yy]$ ]]; then
+                dotnet format --include $(echo $cs_files | tr '\n' ',')
+                log_success "Código formateado automáticamente"
+                log_warning "Revisa los cambios y vuelve a hacer commit"
+                cleanup_on_error
+                exit 1
+            else
+                cleanup_on_error
+                exit 1
+            fi
+        fi
+        
+        log_success "Formato de código verificado"
+    else
+        log_warning "dotnet-format no encontrado, saltando verificación de formato"
+        log_info "Instala con: dotnet tool install -g dotnet-format"
+    fi
+else
+    log_info "No hay archivos C# para formatear"
+fi
+
+# 6. Verificar pruebas unitarias (solo si hay cambios relevantes)
+show_progress $step $total_steps "Ejecutando pruebas críticas"
+step=$((step + 1))
+
+# Ejecutar pruebas solo si hay cambios en código de negocio
+business_files=$(echo "$staged_files" | grep -E '\.(cs)$' | grep -E '(Business|Data|Services)/' || true)
+
+if [ ! -z "$business_files" ] && [ -d "tests" ]; then
+    log_info "Cambios en lógica de negocio detectados, ejecutando pruebas críticas..."
+    
+    # Ejecutar solo pruebas unitarias rápidas (no integración)
+    if ! dotnet test --nologo --verbosity minimal --filter "Category!=Integration&Category!=E2E" --no-build >/dev/null 2>&1; then
+        log_error "Algunas pruebas unitarias fallaron"
+        log_info "Ejecuta 'dotnet test' para ver detalles"
+        cleanup_on_error
+        exit 1
+    fi
+    
+    log_success "Pruebas críticas pasaron"
+else
+    log_info "No se requieren pruebas para estos cambios"
+fi
+
+# 7. Verificación final
+show_progress $step $total_steps "Verificación final"
+
+# Verificar que los archivos staged siguen siendo válidos
+if ! git diff --cached --quiet --exit-code; then
+    # Contar archivos y líneas modificadas
+    files_count=$(echo "$staged_files" | wc -l | tr -d ' ')
+    lines_added=$(git diff --cached --numstat | awk '{sum+=$1} END {print sum+0}')
+    lines_removed=$(git diff --cached --numstat | awk '{sum+=$2} END {print sum+0}')
+    
+    log_success "Cambios validados: $files_count archivos, +$lines_added/-$lines_removed líneas"
+else
+    log_warning "No hay cambios en el stage después de las validaciones"
+fi
+
+# Restaurar cambios no confirmados si los había
+if git stash list | grep -q "$TEMP_STASH"; then
+    log_info "Restaurando cambios no confirmados..."
+    git stash pop -q
+fi
+
+# Limpiar trap
+trap - EXIT
+
+echo "═══════════════════════════════════════════════════════"
+log_success "🎉 Todas las validaciones pre-commit completadas exitosamente"
+echo "${GREEN}✨ Tu código está listo para commit${NC}"
+
+exit 0
