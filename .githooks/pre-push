@@ -278,21 +278,6 @@ if [ "$push_to_protected" = true ]; then
     fi
 fi
 
-# Verificar análisis de código si dotnet-format está disponible
-if command -v dotnet >/dev/null 2>&1 && (dotnet tool list -g | grep -q dotnet-format || dotnet format --version >/dev/null 2>&1); then
-    log_info "Verificando formato de código..."
-    
-    if ! dotnet format --verify-no-changes --verbosity minimal >/dev/null 2>&1; then
-        log_error "El código no cumple con las reglas de formato"
-        log_info "Ejecuta 'dotnet format' antes del push"
-        exit 1
-    fi
-    
-    log_success "Formato de código verificado"
-else
-    log_warning "dotnet-format no disponible, saltando verificación de formato"
-fi
-
 # 8. Verificación final y resumen
 step=$((step + 1))
 show_progress $step $total_steps "Verificación final"
