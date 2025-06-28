@@ -270,7 +270,7 @@ if [ "$push_to_protected" = true ]; then
         
         echo ""
         echo "CONFIRMACION REQUERIDA: ¿Continuar con el push a rama protegida? (y/N): "
-        read REPLY
+        read REPLY </dev/tty
         if [[ ! $REPLY =~ ^[Yy]$ ]]; then
             log_error "Push cancelado por el usuario"
             exit 1
@@ -327,7 +327,7 @@ if [ "$push_to_protected" = true ]; then
     log_critical "Push a rama protegida '$branch_name'"
     echo ""
     echo "CONFIRMACION REQUERIDA: ¿Estás seguro de continuar? (y/N): "
-    read REPLY
+    read REPLY </dev/tty
     if [[ ! $REPLY =~ ^[Yy]$ ]]; then
         log_warning "Push cancelado por el usuario"
         exit 1
