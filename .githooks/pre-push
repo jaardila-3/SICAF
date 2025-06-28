@@ -10,38 +10,29 @@ readonly REMOTE_URL="$2"
 readonly MAIN_BRANCHES="main|master|develop|release"
 readonly CRITICAL_PATHS="src/SICAF.Business|src/SICAF.Data|src/SICAF.Services"
 
-# Colores para output
-readonly RED='\033[0;31m'
-readonly GREEN='\033[0;32m'
-readonly YELLOW='\033[1;33m'
-readonly BLUE='\033[0;34m'
-readonly CYAN='\033[0;36m'
-readonly PURPLE='\033[0;35m'
-readonly NC='\033[0m' # No Color
-
 # Función para logging con timestamp
 log_info() {
-    echo "${BLUE}[$(date +'%H:%M:%S')] ℹ️  $1${NC}"
+    echo "[$(date +'%H:%M:%S')] INFO: $1"
 }
 
 log_success() {
-    echo "${GREEN}[$(date +'%H:%M:%S')] ✅ $1${NC}"
+    echo "[$(date +'%H:%M:%S')] SUCCESS: $1"
 }
 
 log_warning() {
-    echo "${YELLOW}[$(date +'%H:%M:%S')] ⚠️  $1${NC}"
+    echo "[$(date +'%H:%M:%S')] WARNING: $1"
 }
 
 log_error() {
-    echo "${RED}[$(date +'%H:%M:%S')] ❌ $1${NC}"
+    echo "[$(date +'%H:%M:%S')] ERROR: $1"
 }
 
 log_step() {
-    echo "${CYAN}[$(date +'%H:%M:%S')] 🚀 $1${NC}"
+    echo "[$(date +'%H:%M:%S')] STEP: $1"
 }
 
 log_critical() {
-    echo "${PURPLE}[$(date +'%H:%M:%S')] 🔒 $1${NC}"
+    echo "[$(date +'%H:%M:%S')] CRITICAL: $1"
 }
 
 # Función para mostrar progreso
@@ -49,7 +40,7 @@ show_progress() {
     local current=$1
     local total=$2
     local task=$3
-    echo "${CYAN}[$current/$total] $task${NC}"
+    echo "[$current/$total] $task"
 }
 
 # Función para verificar si una rama es protegida
@@ -140,7 +131,7 @@ verify_modified_files() {
     return 0
 }
 
-echo "${PURPLE}🔒 Iniciando validaciones pre-push para SICAF${NC}"
+echo "🔒 Iniciando validaciones pre-push para SICAF"
 echo "═══════════════════════════════════════════════════════"
 log_info "Remote: $REMOTE_NAME ($REMOTE_URL)"
 
@@ -277,7 +268,9 @@ if [ "$push_to_protected" = true ]; then
             echo "  📝 $line"
         done
         
-        read -p "¿Continuar con el push a rama protegida? (y/N): " -n 1 -r
+        echo ""
+        echo "CONFIRMACION REQUERIDA: ¿Continuar con el push a rama protegida? (y/N): "
+        read -n 1 -r REPLY
         echo
         if [[ ! $REPLY =~ ^[Yy]$ ]]; then
             log_error "Push cancelado por el usuario"
@@ -333,7 +326,9 @@ echo "════════════════════════�
 # Confirmación final para ramas protegidas
 if [ "$push_to_protected" = true ]; then
     log_critical "Push a rama protegida '$branch_name'"
-    read -p "¿Estás seguro de continuar? (y/N): " -n 1 -r
+    echo ""
+    echo "CONFIRMACION REQUERIDA: ¿Estás seguro de continuar? (y/N): "
+    read -n 1 -r REPLY
     echo
     if [[ ! $REPLY =~ ^[Yy]$ ]]; then
         log_warning "Push cancelado por el usuario"
@@ -342,6 +337,6 @@ if [ "$push_to_protected" = true ]; then
 fi
 
 log_success "🎉 Todas las validaciones pre-push completadas exitosamente"
-echo "${GREEN}🚀 Tu código está listo para push${NC}"
+echo "🚀 Tu código está listo para push"
 
 exit 0
