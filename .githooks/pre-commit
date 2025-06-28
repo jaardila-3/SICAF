@@ -178,8 +178,7 @@ if [ ! -z "$secrets_found" ]; then
     echo -e "$secrets_found"
     log_warning "Revisa manualmente estos archivos antes de continuar"
     echo "¿Estás seguro de que no hay secretos reales? (y/N): "
-    read -n 1 -r REPLY
-    echo
+    read REPLY
     if [[ ! $REPLY =~ ^[Yy]$ ]]; then
         cleanup_on_error
         exit 1
@@ -228,8 +227,7 @@ if command -v dotnet >/dev/null 2>&1 && [ ! -z "$cs_files" ]; then
             
             # Preguntar si quiere autoformatear
             echo "¿Quieres formatear automáticamente ahora? (y/N): "
-            read -n 1 -r REPLY
-            echo
+            read REPLY
             if [[ $REPLY =~ ^[Yy]$ ]]; then
                 dotnet format --include $(echo $cs_files | tr '\n' ',')
                 log_success "Código formateado automáticamente"
