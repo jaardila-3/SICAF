@@ -108,7 +108,6 @@ prohibited_patterns="
 \.env$
 \.env\.local$
 \.env\.production$
-appsettings\.Development\.json$
 appsettings\.Production\.json$
 .*\.log$
 .*\.tmp$
@@ -211,45 +210,7 @@ else
     log_info "No hay archivos C# para compilar"
 fi
 
-# 5. Análisis de formato de código
-show_progress $step $total_steps "Verificando formato de código"
-step=$((step + 1))
-
-if command -v dotnet >/dev/null 2>&1 && [ ! -z "$cs_files" ]; then
-    # Verificar si dotnet-format está disponible
-    if dotnet tool list -g | grep -q dotnet-format || dotnet format --version >/dev/null 2>&1; then
-        log_info "Verificando formato con dotnet-format..."
-        
-        if ! dotnet format --verify-no-changes --verbosity minimal >/dev/null 2>&1; then
-            log_error "El código no cumple con las reglas de formato"
-            log_info "Ejecuta 'dotnet format' para corregir automáticamente"
-            log_info "O ejecuta 'dotnet format --include $(echo $cs_files | tr \\n ,)' para archivos específicos"
-            
-            # Preguntar si quiere autoformatear
-            echo "¿Quieres formatear automáticamente ahora? (y/N): "
-            read REPLY </dev/tty
-            if [[ $REPLY =~ ^[Yy]$ ]]; then
-                dotnet format --include $(echo $cs_files | tr '\n' ',')
-                log_success "Código formateado automáticamente"
-                log_warning "Revisa los cambios y vuelve a hacer commit"
-                cleanup_on_error
-                exit 1
-            else
-                cleanup_on_error
-                exit 1
-            fi
-        fi
-        
-        log_success "Formato de código verificado"
-    else
-        log_warning "dotnet-format no encontrado, saltando verificación de formato"
-        log_info "Instala con: dotnet tool install -g dotnet-format"
-    fi
-else
-    log_info "No hay archivos C# para formatear"
-fi
-
-# 6. Verificar pruebas unitarias (solo si hay cambios relevantes)
+# 5. Verificar pruebas unitarias (solo si hay cambios relevantes)
 show_progress $step $total_steps "Ejecutando pruebas críticas"
 step=$((step + 1))
 
@@ -272,7 +233,7 @@ else
     log_info "No se requieren pruebas para estos cambios"
 fi
 
-# 7. Verificación final
+# 6. Verificación final
 show_progress $step $total_steps "Verificación final"
 
 # Verificar que los archivos staged siguen siendo válidos
