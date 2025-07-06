@@ -180,57 +180,54 @@ dotnet add tests/SICAF.IntegrationTests/SICAF.IntegrationTests.csproj reference 
 
 ```bash
 # Paquetes de Entity Framework Core para MySQL
-dotnet add src/SICAF.Data/SICAF.Data.csproj package Microsoft.EntityFrameworkCore
-dotnet add src/SICAF.Data/SICAF.Data.csproj package Microsoft.EntityFrameworkCore.Design
-dotnet add src/SICAF.Data/SICAF.Data.csproj package MySql.EntityFrameworkCore
-dotnet add src/SICAF.Data/SICAF.Data.csproj package Microsoft.EntityFrameworkCore.Tools
+dotnet add src/SICAF.Data/SICAF.Data.csproj package Microsoft.EntityFrameworkCore --version 8.0.17
+dotnet add src/SICAF.Data/SICAF.Data.csproj package MySql.EntityFrameworkCore --version 8.0.14
 ```
 
 ### 6.2 Para SICAF.Common (Validación)
 
 ```bash
 # FluentValidation para validaciones
-dotnet add src/SICAF.Common/SICAF.Common.csproj package FluentValidation
-dotnet add src/SICAF.Common/SICAF.Common.csproj package FluentValidation.AspNetCore
+dotnet add src/SICAF.Common/SICAF.Common.csproj package FluentValidation --version 12.0.0
 ```
 
 ### 6.3 Para SICAF.Web (Logging y Variables de Entorno)
 
 ```bash
 # Serilog para logging
-dotnet add src/SICAF.Web/SICAF.Web.csproj package Serilog.AspNetCore
-dotnet add src/SICAF.Web/SICAF.Web.csproj package Serilog.Sinks.Console
-dotnet add src/SICAF.Web/SICAF.Web.csproj package Serilog.Sinks.File
-dotnet add src/SICAF.Web/SICAF.Web.csproj package Serilog.Sinks.MySQL
+dotnet add src/SICAF.Web/SICAF.Web.csproj package Serilog.AspNetCore --version 8.0.3
 
 # DotNetEnv para variables de entorno
-dotnet add src/SICAF.Web/SICAF.Web.csproj package DotNetEnv
+dotnet add src/SICAF.Web/SICAF.Web.csproj package DotNetEnv --version 3.1.1
 
 # Entity Framework para migraciones
-dotnet add src/SICAF.Web/SICAF.Web.csproj package Microsoft.EntityFrameworkCore.Design
+dotnet add src/SICAF.Web/SICAF.Web.csproj package Microsoft.EntityFrameworkCore.Tools --version 8.0.17
 ```
 
-### 6.4 Para SICAF.Services (Servicios Externos)
+### 6.4 Para SICAF.Business (Lógica de Negocio)
+
+```bash
+# MediatR para mediación de comandos y consultas
+dotnet add src/SICAF.Business/SICAF.Business.csproj package MediatR --version 13.0.0
+```
+
+### 6.5 Para SICAF.Services (Servicios Externos)
 
 ```bash
 # Para servicios de email y almacenamiento
-dotnet add src/SICAF.Services/SICAF.Services.csproj package Microsoft.Extensions.DependencyInjection.Abstractions
-dotnet add src/SICAF.Services/SICAF.Services.csproj package Microsoft.Extensions.Configuration.Abstractions
-dotnet add src/SICAF.Services/SICAF.Services.csproj package Microsoft.Extensions.Logging.Abstractions
+dotnet add src/SICAF.Services/SICAF.Services.csproj package Microsoft.Extensions.DependencyInjection.Abstractions --version 8.0.2
 ```
 
-### 6.5 Para Pruebas
+### 6.6 Para Pruebas
 
 ```bash
 # Paquetes para pruebas unitarias
 dotnet add tests/SICAF.UnitTests/SICAF.UnitTests.csproj package Moq
-dotnet add tests/SICAF.UnitTests/SICAF.UnitTests.csproj package FluentAssertions
-dotnet add tests/SICAF.UnitTests/SICAF.UnitTests.csproj package Microsoft.EntityFrameworkCore.InMemory
+dotnet add tests/SICAF.UnitTests/SICAF.UnitTests.csproj package coverlet.collector
 
 # Paquetes para pruebas de integración
-dotnet add tests/SICAF.IntegrationTests/SICAF.IntegrationTests.csproj package Microsoft.AspNetCore.Mvc.Testing
-dotnet add tests/SICAF.IntegrationTests/SICAF.IntegrationTests.csproj package FluentAssertions
 dotnet add tests/SICAF.IntegrationTests/SICAF.IntegrationTests.csproj package Microsoft.EntityFrameworkCore.InMemory
+dotnet add tests/SICAF.IntegrationTests/SICAF.IntegrationTests.csproj package coverlet.collector
 ```
 
 ## 7. Crear Estructura de Carpetas Internas
@@ -253,7 +250,10 @@ cd ../..
 ```bash
 # Crear carpetas para servicios y validadores
 cd src/SICAF.Business
-mkdir Services
+mkdir Behaviors
+mkdir CQRS
+mkdir ExternalServices
+mkdir DomainServices
 mkdir Interfaces
 mkdir Validators
 cd ../..
@@ -277,11 +277,12 @@ cd ../..
 ```bash
 # Crear carpetas para utilidades compartidas
 cd src/SICAF.Common
-mkdir DTOs
+mkdir ServiceRegistration
 mkdir Extensions
 mkdir Helpers
 mkdir Constants
-mkdir Models
+mkdir Enums
+mkdir Interfaces
 cd ../..
 ```
 
@@ -291,7 +292,7 @@ cd ../..
 # Crear carpetas para servicios externos
 cd src/SICAF.Services
 mkdir Email
-mkdir FileStorage
+mkdir ServiceRegistration
 mkdir Interfaces
 cd ../..
 ```
@@ -309,57 +310,7 @@ dotnet restore
 dotnet sln list
 ```
 
-## 9. Estructura Final del Proyecto
-
-```
-SICAF/
-├── SICAF.sln
-├── src/
-│   ├── SICAF.Web/                    # MVC Web Application
-│   │   ├── Areas/
-│   │   │   ├── Account/
-│   │   │   ├── Academic/
-│   │   │   └── Admin/
-│   │   ├── Controllers/
-│   │   ├── Views/
-│   │   ├── wwwroot/
-│   │   ├── Middleware/
-│   │   ├── Extensions/
-│   │   └── Program.cs
-│   │
-│   ├── SICAF.Business/               # Business Logic Layer
-│   │   ├── Services/
-│   │   ├── Interfaces/
-│   │   └── Validators/
-│   │
-│   ├── SICAF.Data/                   # Data Access Layer
-│   │   ├── Context/
-│   │   ├── Entities/
-│   │   ├── Repositories/
-│   │   ├── Configurations/
-│   │   └── Migrations/
-│   │
-│   ├── SICAF.Common/                 # Shared Utilities
-│   │   ├── DTOs/
-│   │   ├── Extensions/
-│   │   ├── Helpers/
-│   │   ├── Constants/
-│   │   └── Models/
-│   │
-│   └── SICAF.Services/               # External Services
-│       ├── Email/
-│       ├── FileStorage/
-│       └── Interfaces/
-│
-├── tests/
-│   ├── SICAF.UnitTests/              # Unit Tests
-│   └── SICAF.IntegrationTests/       # Integration Tests
-│
-└── docs/                             # Documentation
-    └── Architecture.md
-```
-
-## 10. Próximos Pasos
+## 9. Próximos Pasos
 
 1. **Configurar Program.cs** en SICAF.Web con DI, autenticación y Serilog
 2. **Crear DbContext** en SICAF.Data
@@ -369,5 +320,3 @@ SICAF/
 6. **Configurar áreas MVC** con controladores y vistas
 7. **Configurar variables de entorno** (.env)
 8. **Ejecutar primera migración**
-
-Con esta estructura tendrás un proyecto robusto y bien organizado siguiendo las mejores prácticas de .NET 8 y arquitectura en capas.
