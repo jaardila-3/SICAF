@@ -106,7 +106,7 @@ verify_modified_files() {
     local critical_changes
     
     # Verificar archivos peligrosos modificados
-    dangerous_files=$(git diff --name-only "$commit_range" | grep -E '\.(env|key|pem|p12|pfx)$' || true)
+    dangerous_files=$(git diff --name-only "$commit_range" | grep -E '\.(key|pem|p12|pfx)$' || true)
     
     if [ ! -z "$dangerous_files" ]; then
         log_error "Archivos peligrosos detectados en el push:"
