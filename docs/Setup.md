@@ -189,6 +189,12 @@ dotnet add src/SICAF.Data/SICAF.Data.csproj package MySql.EntityFrameworkCore --
 ```bash
 # FluentValidation para validaciones
 dotnet add src/SICAF.Common/SICAF.Common.csproj package FluentValidation --version 12.0.0
+# Microsoft.Extensions.DependencyInjection para inyección de dependencias
+dotnet add src/SICAF.Common/SICAF.Common.csproj package Microsoft.Extensions.DependencyInjection --version 8.0.1
+# Microsoft.Extensions.Options para configuración: patron de opciones
+dotnet add src/SICAF.Common/SICAF.Common.csproj package Microsoft.Extensions.Options --version 8.0.2
+dotnet add src/SICAF.Common/SICAF.Common.csproj package Microsoft.Extensions.Options.ConfigurationExtensions --version 8.0.0
+dotnet add src/SICAF.Common/SICAF.Common.csproj package Microsoft.Extensions.Options.DataAnnotations --version 8.0.0
 ```
 
 ### 6.3 Para SICAF.Web (Logging y Variables de Entorno)

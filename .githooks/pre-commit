@@ -105,9 +105,12 @@ step=$((step + 1))
 
 # Patrones de archivos prohibidos
 prohibited_patterns="
-\.env$
-\.env\.local$
-\.env\.production$
+^\.env$
+^\.env\.local$
+^\.env\.development$
+^\.env\.production$
+^\.env\.staging$
+^\.env\.test$
 appsettings\.Production\.json$
 .*\.log$
 .*\.tmp$
@@ -259,6 +262,6 @@ trap - EXIT
 
 echo "═══════════════════════════════════════════════════════"
 log_success "🎉 Todas las validaciones pre-commit completadas exitosamente"
-echo "✨ Tu código está listo para commit"
+echo "✨ Continuar con la validación del mensaje de commit"
 
 exit 0

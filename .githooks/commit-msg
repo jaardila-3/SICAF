@@ -68,8 +68,8 @@ if [ $msg_length -lt 10 ]; then
     exit 1
 fi
 
-if [ $msg_length -gt 100 ]; then
-    mostrar_error "El mensaje es demasiado largo (máximo 100 caracteres)"
+if [ $msg_length -gt 1000 ]; then
+    mostrar_error "El mensaje es demasiado largo (máximo 1000 caracteres)"
     mostrar_info "Considera usar el cuerpo del commit para detalles adicionales"
     exit 1
 fi
