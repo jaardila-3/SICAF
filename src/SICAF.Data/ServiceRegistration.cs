@@ -25,9 +25,7 @@ public static class ServiceRegistration
 
         // Servicios
         services.AddScoped<IAuditService, AuditService>();
-        services.AddScoped<IAuditable, User>();
-        services.AddScoped<IAuditable, Role>();
-        services.AddScoped<IAuditable, UserRole>();
+
         //services.AddScoped<ISpecification, >();
 
         // Repositorios

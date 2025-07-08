@@ -397,3 +397,55 @@ fix(auth): corregir validación de roles de instructor
 docs(readme): actualizar instrucciones de instalación
 test(services): agregar pruebas unitarias para StudentService
 ```
+
+# ============================================
+# COMANDOS PARA ENTITY FRAMEWORK MIGRATIONS
+# ============================================
+
+# 1. Crear la migración inicial para Identity
+dotnet ef migrations add "IdentityEntities" \
+    --project src/SICAF.Data/ \
+    --startup-project src/SICAF.Web/ \
+    --context SicafDbContext \
+    --output-dir Migrations
+
+# 2. Aplicar la migración a la base de datos
+dotnet ef database update \
+    --project src/SICAF.Data/ \
+    --startup-project src/SICAF.Web/ \
+    --context SicafDbContext
+
+# 3. Generar script SQL (opcional, para revisión)
+dotnet ef migrations script \
+    --project src/SICAF.Data/ \
+    --startup-project src/SICAF.Web/ \
+    --context SicafDbContext \
+    --output migrations/identity_script.sql
+
+# ============================================
+# COMANDOS ADICIONALES ÚTILES
+# ============================================
+
+# Verificar el estado de las migraciones
+dotnet ef migrations list \
+    --project src/SICAF.Data/ \
+    --startup-project src/SICAF.Web/
+
+# Revertir a una migración específica
+dotnet ef database update PreviousMigrationName \
+    --project src/SICAF.Data/ \
+    --startup-project src/SICAF.Web/
+
+# Remover la última migración (solo si no se ha aplicado)
+dotnet ef migrations remove \
+    --project src/SICAF.Data/ \
+    --startup-project src/SICAF.Web/
+
+# ============================================
+# VERIFICAR CONEXIÓN DE BASE DE DATOS
+# ============================================
+
+# Probar la conexión antes de ejecutar migraciones
+dotnet ef dbcontext info \
+    --project src/SICAF.Data/ \
+    --startup-project src/SICAF.Web/

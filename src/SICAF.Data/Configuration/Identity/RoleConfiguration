@@ -1,6 +1,0 @@
-namespace SICAF.Data.Configuration.Identity;
-
-public class RoleConfiguration
-{
-
-}

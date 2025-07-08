@@ -130,7 +130,7 @@ public class AuditService(SicafDbContext context, IAuditContextProvider contextP
             .ToListAsync();
     }
 
-
+    #region private methods
     private string GetOperationType(EntityState state)
     {
         return state switch
@@ -222,4 +222,5 @@ public class AuditService(SicafDbContext context, IAuditContextProvider contextP
 
         return auditLog;
     }
+    #endregion
 }
