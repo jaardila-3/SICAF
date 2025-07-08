@@ -1,8 +1,9 @@
 using SICAF.Data.Entities.Common;
+using SICAF.Data.Interfaces;
 
 namespace SICAF.Data.Entities.Identity;
 
-public class Role : BaseEntity
+public class Role : BaseEntity, IAuditable
 {
     public string Name { get; set; } = string.Empty;
     public string? Description { get; set; }

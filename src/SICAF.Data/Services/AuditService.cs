@@ -11,7 +11,7 @@ using SICAF.Data.Context;
 using SICAF.Data.Entities.Common;
 using SICAF.Data.Interfaces;
 
-namespace SICAF.Business.DomainServices.Implementation;
+namespace SICAF.Data.Services;
 
 public class AuditService(SicafDbContext context, IAuditContextProvider contextProvider) : IAuditService
 {

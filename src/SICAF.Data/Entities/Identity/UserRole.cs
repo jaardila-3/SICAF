@@ -1,9 +1,10 @@
 using SICAF.Common.Constants;
 using SICAF.Data.Entities.Common;
+using SICAF.Data.Interfaces;
 
 namespace SICAF.Data.Entities.Identity;
 
-public class UserRole : BaseEntity
+public class UserRole : BaseEntity, IAuditable
 {
     public Guid UserId { get; set; }
     public Guid RoleId { get; set; }

@@ -3,9 +3,11 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
 using SICAF.Data.Context;
+using SICAF.Data.Entities.Identity;
 using SICAF.Data.Interfaces;
 using SICAF.Data.Repositories;
 using SICAF.Data.Seeding;
+using SICAF.Data.Services;
 
 namespace SICAF.Data;
 
@@ -22,6 +24,10 @@ public static class ServiceRegistration
         });
 
         // Servicios
+        services.AddScoped<IAuditService, AuditService>();
+        services.AddScoped<IAuditable, User>();
+        services.AddScoped<IAuditable, Role>();
+        services.AddScoped<IAuditable, UserRole>();
         //services.AddScoped<ISpecification, >();
 
         // Repositorios

@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 
+using SICAF.Data.Entities.Common;
 using SICAF.Data.Entities.Identity;
 
 namespace SICAF.Data.Context;
@@ -15,5 +16,6 @@ public class SicafDbContext(DbContextOptions<SicafDbContext> options) : DbContex
     public DbSet<User> Users { get; set; }
     public DbSet<Role> Roles { get; set; }
     public DbSet<UserRole> UserRoles { get; set; }
+    public DbSet<AuditLog> AuditLogs { get; set; }
 
 }
